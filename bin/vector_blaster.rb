@@ -265,7 +265,7 @@ def draw_ship(renderer, ship)
     ly = p[1]
     rx = lx * Math.cos(h) - ly * Math.sin(h)
     ry = lx * Math.sin(h) + ly * Math.cos(h)
-    [(cx + rx).round, (cy + ry).round]
+    [(cx + rx).round.to_f, (cy + ry).round.to_f]
   end
 
   c = SDL::Color::WHITE
@@ -285,7 +285,7 @@ def draw_asteroid(renderer, a)
   while i < n
     angle = a[:rotation] + (i.to_f / n) * TWO_PI
     r     = a[:radius] * a[:verts][i]
-    pts.push([(a[:x] + Math.cos(angle) * r).round, (a[:y] + Math.sin(angle) * r).round])
+    pts.push([(a[:x] + Math.cos(angle) * r).round.to_f, (a[:y] + Math.sin(angle) * r).round.to_f])
     i += 1
   end
 
