@@ -61,12 +61,20 @@ def new_asteroid(x, y, radius)
   }
 end
 
-def split_asteroid(state, a)
+# Pushes fragments onto `spawned` rather than directly onto
+# state[:asteroids]. This is called from inside check_bullet_hits' loop
+# over state[:asteroids] itself; pushing new elements onto that same
+# array mid-iteration corrupts it under Spinel (confirmed by an isolated
+# repro: a single hit on a lone asteroid left state[:asteroids] with zero
+# elements instead of two fresh fragments) even though the identical
+# sequence works fine under plain Ruby. Collecting spawns separately and
+# merging them into `survivors` only after the loop finishes sidesteps it.
+def split_asteroid(state, a, spawned)
   if a[:radius] > MIN_SPLIT_RADIUS
     state[:score] += 20
     new_r = a[:radius] * 0.55
-    state[:asteroids].push(new_asteroid(a[:x], a[:y], new_r))
-    state[:asteroids].push(new_asteroid(a[:x], a[:y], new_r))
+    spawned.push(new_asteroid(a[:x], a[:y], new_r))
+    spawned.push(new_asteroid(a[:x], a[:y], new_r))
   else
     state[:score] += 50
   end
@@ -210,13 +218,15 @@ def check_bullet_hits(state)
   return if hit_asteroids.empty?
 
   survivors = []
+  spawned   = []
   state[:asteroids].each_with_index do |a, ai|
     if hit_asteroids[ai]
-      split_asteroid(state, a)
+      split_asteroid(state, a, spawned)
     else
       survivors.push(a)
     end
   end
+  spawned.each { |s| survivors.push(s) }
   state[:asteroids] = survivors
 
   survivors_b = []
