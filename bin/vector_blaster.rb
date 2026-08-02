@@ -279,21 +279,27 @@ def draw_asteroid(renderer, a)
   c = SDL::Color::GRAY
   renderer.draw_color(c[0], c[1], c[2], c[3])
 
+  # Spinel compiler bug: the first element of a 2-element array literal
+  # pushed via `array.push([a, b])` from inside a `while` loop is corrupted
+  # once that push site executes more than once per call; the second
+  # element is unaffected. Sidestepped here with two parallel arrays
+  # instead of an array of [x, y] pairs.
   n = a[:verts].length
-  pts = []
+  pts_x = []
+  pts_y = []
   i = 0
   while i < n
     angle = a[:rotation] + (i.to_f / n) * TWO_PI
     r     = a[:radius] * a[:verts][i]
-    pts.push([(a[:x] + Math.cos(angle) * r).round.to_f, (a[:y] + Math.sin(angle) * r).round.to_f])
+    pts_x.push((a[:x] + Math.cos(angle) * r).round.to_f)
+    pts_y.push((a[:y] + Math.sin(angle) * r).round.to_f)
     i += 1
   end
 
   i = 0
   while i < n
-    p1 = pts[i]
-    p2 = pts[(i + 1) % n]
-    renderer.draw_line(p1[0], p1[1], p2[0], p2[1])
+    j = (i + 1) % n
+    renderer.draw_line(pts_x[i], pts_y[i], pts_x[j], pts_y[j])
     i += 1
   end
 end
