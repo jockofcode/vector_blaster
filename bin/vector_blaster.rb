@@ -115,31 +115,42 @@ end
 
 # ---- Updates ----
 
+
+# Spinel compiler bug: a compound assignment (+=, -=, *=, /=) through a
+# Hash local extracted from a parent Hash via `local = outer[:key]` silently
+# no-ops -- the write is lost even though a plain `=` assignment through
+# the same extracted local correctly aliases the original. Confirmed by an
+# isolated repro outside this game: `ship = state[:ship]; ship[:x] -= 1`
+# leaves both `ship[:x]` and `state[:ship][:x]` unchanged under `spinel -E`,
+# while `ship[:x] = ship[:x] - 1` (same extracted local) works correctly.
+# This was silently breaking every line below -- the ship never turned,
+# thrusted, dragged, or lost invulnerability, since `ship` here is exactly
+# such an extracted local. Fix: explicit `x = x OP y` form throughout.
 def update_ship(state)
   ship = state[:ship]
 
-  ship[:heading] -= SHIP_TURN_SPEED if ship[:turn_left]
-  ship[:heading] += SHIP_TURN_SPEED if ship[:turn_right]
+  ship[:heading] = ship[:heading] - SHIP_TURN_SPEED if ship[:turn_left]
+  ship[:heading] = ship[:heading] + SHIP_TURN_SPEED if ship[:turn_right]
 
   if ship[:thrusting]
-    ship[:dx] += Math.sin(ship[:heading]) * SHIP_THRUST
-    ship[:dy] -= Math.cos(ship[:heading]) * SHIP_THRUST
+    ship[:dx] = ship[:dx] + Math.sin(ship[:heading]) * SHIP_THRUST
+    ship[:dy] = ship[:dy] - Math.cos(ship[:heading]) * SHIP_THRUST
   end
 
-  ship[:dx] *= SHIP_DRAG
-  ship[:dy] *= SHIP_DRAG
+  ship[:dx] = ship[:dx] * SHIP_DRAG
+  ship[:dy] = ship[:dy] * SHIP_DRAG
 
   speed = Math.sqrt(ship[:dx] * ship[:dx] + ship[:dy] * ship[:dy])
   if speed > SHIP_MAX_SPEED
     scale = SHIP_MAX_SPEED / speed
-    ship[:dx] *= scale
-    ship[:dy] *= scale
+    ship[:dx] = ship[:dx] * scale
+    ship[:dy] = ship[:dy] * scale
   end
 
   ship[:x] = wrap(ship[:x] + ship[:dx], WIDTH.to_f)
   ship[:y] = wrap(ship[:y] + ship[:dy], HEIGHT.to_f)
 
-  ship[:invuln] -= 1 if ship[:invuln] > 0
+  ship[:invuln] = ship[:invuln] - 1 if ship[:invuln] > 0
 end
 
 def fire_bullet(state)
@@ -322,6 +333,9 @@ def draw_hud(renderer, font, state)
     warn = SDL::Color::RED
     renderer.draw_text(font, "GAME OVER", WIDTH / 2 - 70, HEIGHT / 2 - 30, warn[0], warn[1], warn[2], warn[3])
     renderer.draw_text(font, "R to restart", WIDTH / 2 - 70, HEIGHT / 2, hud[0], hud[1], hud[2], hud[3])
+  else
+    help = SDL::Color::GRAY
+    renderer.draw_text(font, "Left/Right: rotate   Up: thrust   Space: fire   Esc: quit", 12, HEIGHT - 28, help[0], help[1], help[2], help[3])
   end
 end
 
