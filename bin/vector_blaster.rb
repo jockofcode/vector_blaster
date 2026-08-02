@@ -24,7 +24,11 @@ BASE_RADIUS      = 46.0
 MIN_SPLIT_RADIUS = 18.0
 BASE_COUNT       = 4
 
+WARP_GRID_STEP = 24.0
+WARP_INVULN    = INVULN_FRAMES / 2
+
 R_KEY = "r".ord
+W_KEY = "w".ord
 
 def wrap(v, max)
   v += max if v < 0
@@ -104,6 +108,66 @@ def respawn_ship(state)
     turn_left: false, turn_right: false,
     invuln: INVULN_FRAMES,
   }
+end
+
+# Shortest signed distance from a to b on a wrapped [0, size) axis -- e.g.
+# on a 800-wide axis, going from x=10 to x=790 is a delta of -20 (wrap
+# left) rather than +780 (the raw difference). The ship and asteroids
+# wrap the screen, so "most room around it" needs to measure distance the
+# same way the world actually behaves, not as if the edges were walls.
+def wrapped_delta(a, b, size)
+  d    = b - a
+  half = size / 2.0
+  d = d + size if d < 0 - half
+  d = d - size if d > half
+  d
+end
+
+# Scans a coarse grid of candidate points and returns the one whose
+# closest asteroid (measured wrapped, and net of that asteroid's own
+# radius) is as far away as possible -- the spot with the most open room
+# around it, not just an arbitrary/random teleport.
+def find_warp_spot(asteroids)
+  return [WIDTH / 2.0, HEIGHT / 2.0] if asteroids.empty?
+
+  best_x         = WIDTH / 2.0
+  best_y         = HEIGHT / 2.0
+  best_clearance = 0 - 1.0
+
+  gy = WARP_GRID_STEP / 2.0
+  while gy < HEIGHT
+    gx = WARP_GRID_STEP / 2.0
+    while gx < WIDTH
+      clearance = 999_999.0
+      asteroids.each do |a|
+        dx = wrapped_delta(gx, a[:x], WIDTH.to_f)
+        dy = wrapped_delta(gy, a[:y], HEIGHT.to_f)
+        d  = Math.sqrt(dx * dx + dy * dy) - a[:radius]
+        clearance = d if d < clearance
+      end
+
+      if clearance > best_clearance
+        best_clearance = clearance
+        best_x         = gx
+        best_y         = gy
+      end
+
+      gx += WARP_GRID_STEP
+    end
+    gy += WARP_GRID_STEP
+  end
+
+  [best_x, best_y]
+end
+
+def warp_ship(state)
+  spot = find_warp_spot(state[:asteroids])
+  ship = state[:ship]
+  ship[:x]      = spot[0]
+  ship[:y]      = spot[1]
+  ship[:dx]     = 0.0
+  ship[:dy]     = 0.0
+  ship[:invuln] = WARP_INVULN
 end
 
 def new_game
@@ -345,7 +409,7 @@ def draw_hud(renderer, font, state)
     renderer.draw_text(font, "R to restart", WIDTH / 2 - 70, HEIGHT / 2, hud[0], hud[1], hud[2], hud[3])
   else
     help = SDL::Color::GRAY
-    renderer.draw_text(font, "Left/Right: rotate   Up: thrust   Space: fire   Esc: quit", 12, HEIGHT - 28, help[0], help[1], help[2], help[3])
+    renderer.draw_text(font, "Left/Right: rotate   Up: thrust   Space: fire   W: warp   Esc: quit", 12, HEIGHT - 28, help[0], help[1], help[2], help[3])
   end
 end
 
@@ -389,6 +453,8 @@ SDL::Screen.open("Vector Blaster", width: WIDTH, height: HEIGHT) do |window, ren
           state[:ship][:thrusting] = true
         elsif key == LibSDL::K_SPACE
           fire_bullet(state)
+        elsif key == W_KEY
+          warp_ship(state)
         end
       elsif event_type == LibSDL::KEYUP
         key = SDL::Event.key_sym

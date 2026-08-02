@@ -49,5 +49,6 @@ spin build
 | Left / Right | Rotate ship |
 | Up | Thrust |
 | Space | Fire |
+| W | Warp to the spot on screen with the most open room around it |
 | R | Restart (after game over) |
 | Esc | Quit |
