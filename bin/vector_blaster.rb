@@ -99,17 +99,6 @@ def spawn_wave(state)
   end
 end
 
-def respawn_ship(state)
-  state[:ship] = {
-    x: WIDTH / 2.0, y: HEIGHT / 2.0,
-    dx: 0.0, dy: 0.0,
-    heading: 0.0,
-    thrusting: false,
-    turn_left: false, turn_right: false,
-    invuln: INVULN_FRAMES,
-  }
-end
-
 # Shortest signed distance from a to b on a wrapped [0, size) axis -- e.g.
 # on a 800-wide axis, going from x=10 to x=790 is a delta of -20 (wrap
 # left) rather than +780 (the raw difference). The ship and asteroids
@@ -126,7 +115,8 @@ end
 # Scans a coarse grid of candidate points and returns the one whose
 # closest asteroid (measured wrapped, and net of that asteroid's own
 # radius) is as far away as possible -- the spot with the most open room
-# around it, not just an arbitrary/random teleport.
+# around it. Used both for the W warp key and for spawning/respawning the
+# ship clear of whatever's currently on screen.
 def find_warp_spot(asteroids)
   return [WIDTH / 2.0, HEIGHT / 2.0] if asteroids.empty?
 
@@ -158,6 +148,25 @@ def find_warp_spot(asteroids)
   end
 
   [best_x, best_y]
+end
+
+# Spawns/respawns the ship at whichever point on screen is clearest of
+# asteroids, rather than always the fixed screen center -- at game start
+# state[:asteroids] is empty so this still lands at center (matching
+# find_warp_spot's empty-field default, which spawn_wave's own
+# keep-away-from-center check is written around), but a mid-level
+# respawn after losing a life now avoids dropping the ship back into
+# whatever's currently on screen.
+def respawn_ship(state)
+  spot = find_warp_spot(state[:asteroids])
+  state[:ship] = {
+    x: spot[0], y: spot[1],
+    dx: 0.0, dy: 0.0,
+    heading: 0.0,
+    thrusting: false,
+    turn_left: false, turn_right: false,
+    invuln: INVULN_FRAMES,
+  }
 end
 
 def warp_ship(state)
