@@ -26,6 +26,7 @@ BASE_COUNT       = 4
 
 WARP_GRID_STEP = 24.0
 WARP_INVULN    = INVULN_FRAMES / 2
+SPAWN_SAFE_RADIUS = 150.0
 
 R_KEY = "r".ord
 W_KEY = "w".ord
@@ -86,14 +87,28 @@ end
 
 def spawn_wave(state)
   count = BASE_COUNT + state[:level]
+  ship  = state[:ship]
+
   i = 0
   while i < count
     ax = frand * WIDTH
     ay = frand * HEIGHT
-    # keep new asteroids away from screen center where the ship respawns
-    if (ax - WIDTH / 2.0).abs < 120 && (ay - HEIGHT / 2.0).abs < 120
-      ax = 0.0
+
+    # Keep new asteroids clear of wherever the ship actually is right now
+    # (not a fixed screen point -- the ship can be anywhere by the time a
+    # level clears, and next-level spawns don't move it). Measured wrapped
+    # since the map wraps. If the roll landed within the safe radius,
+    # shift it to the wrapped-antipodal point instead: on an 800x600
+    # wrapped map, shifting by (width/2, height/2) moves any point at
+    # least ~350px from a spot that started within 150px of the ship,
+    # guaranteed clear with no retry loop needed.
+    dx = wrapped_delta(ax, ship[:x], WIDTH.to_f)
+    dy = wrapped_delta(ay, ship[:y], HEIGHT.to_f)
+    if Math.sqrt(dx * dx + dy * dy) < SPAWN_SAFE_RADIUS
+      ax = wrap(ax + WIDTH / 2.0, WIDTH.to_f)
+      ay = wrap(ay + HEIGHT / 2.0, HEIGHT.to_f)
     end
+
     state[:asteroids].push(new_asteroid(ax, ay, BASE_RADIUS))
     i += 1
   end
