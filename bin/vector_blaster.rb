@@ -287,6 +287,7 @@ end
 def check_bullet_hits(state)
   hit_bullets    = {}
   hit_asteroids  = {}
+  any_hit        = false
 
   state[:bullets].each_with_index do |b, bi|
     next if hit_bullets[bi]
@@ -299,11 +300,21 @@ def check_bullet_hits(state)
       if Math.sqrt(dx * dx + dy * dy) < a[:radius]
         hit_bullets[bi]   = true
         hit_asteroids[ai] = true
+        any_hit           = true
       end
     end
   end
 
-  return if hit_asteroids.empty?
+  # Spinel compiler bug (latest Spinel): calling `.empty?` on a Hash in an
+  # early-return guard corrupts that same Hash's later reads within the
+  # same method -- `return if hit_asteroids.empty?` here left every
+  # subsequent `hit_asteroids[ai]` lookup reading false, so hits still
+  # consumed the bullet but the asteroid never split (confirmed via an
+  # isolated repro: identical code matches CRuby with a separate `any_hit`
+  # boolean but diverges as soon as the guard queries `hit_asteroids`
+  # itself; see spinel_issues/hash-empty-check-in-early-return-poisons-
+  # later-index-reads). Tracking the guard in its own boolean sidesteps it.
+  return unless any_hit
 
   survivors = []
   spawned   = []
